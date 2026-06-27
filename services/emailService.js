@@ -204,7 +204,7 @@ async function sendContactFormEmail(name, phone, email, message) {
 
   const mailOptions = {
     to: 'counsellingiseasy4u@gmail.com', // Always send contact forms to admin
-    subject: \`Contact Form Submission from \${name}\`,
+    subject: `Contact Form Submission from ${name}`,
     html: html
   };
 
@@ -243,7 +243,7 @@ async function sendAdminNotificationEmail(studentName, rank, category, predictio
 
   const mailOptions = {
     to: 'counsellingiseasy4u@gmail.com',
-    subject: \`Admin Alert: New Prediction - \${studentName}\`,
+    subject: `Admin Alert: New Prediction - ${studentName}`,
     html: html
   };
 
