@@ -1,16 +1,26 @@
-const { Resend } = require('resend');
+const nodemailer = require('nodemailer');
 const fs = require('fs');
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
-// If you verify your domain on Resend, change this to something like 'Counselling Is Easy <info@vijaypathtestseries.com>'
-const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev';
+const EMAIL_HOST = process.env.EMAIL_HOST;
+const EMAIL_PORT = process.env.EMAIL_PORT;
+const EMAIL_USER = process.env.EMAIL_USER;
+const EMAIL_PASS = process.env.EMAIL_PASS;
+const EMAIL_FROM = `Counselling Is Easy 4U <${EMAIL_USER}>`;
 
-let resend = null;
-if (RESEND_API_KEY) {
-  resend = new Resend(RESEND_API_KEY);
-  console.log('Resend email API configured.');
+let transporter = null;
+if (EMAIL_USER && EMAIL_PASS) {
+  transporter = nodemailer.createTransport({
+    host: EMAIL_HOST || 'smtp.gmail.com',
+    port: EMAIL_PORT || 587,
+    secure: false, // true for 465, false for other ports
+    auth: {
+      user: EMAIL_USER,
+      pass: EMAIL_PASS,
+    },
+  });
+  console.log('Nodemailer email API configured.');
 } else {
-  console.log('No RESEND_API_KEY configuration found. Running email service in MOCK mode (emails print to console).');
+  console.log('No Nodemailer configuration found. Running email service in MOCK mode (emails print to console).');
 }
 
 /**
@@ -19,8 +29,8 @@ if (RESEND_API_KEY) {
 async function sendMailWithRetry(mailOptions, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      if (resend) {
-        const resendPayload = {
+      if (transporter) {
+        const nodemailerPayload = {
           from: EMAIL_FROM,
           to: mailOptions.to,
           subject: mailOptions.subject,
@@ -28,23 +38,15 @@ async function sendMailWithRetry(mailOptions, retries = 3) {
         };
 
         if (mailOptions.attachments && mailOptions.attachments.length > 0) {
-          const attachment = mailOptions.attachments[0];
-          // Read the PDF file into a buffer for Resend
-          const contentBuffer = fs.readFileSync(attachment.path);
-          resendPayload.attachments = [
-            {
-              filename: attachment.filename,
-              content: contentBuffer
-            }
-          ];
+          nodemailerPayload.attachments = mailOptions.attachments.map(att => ({
+            filename: att.filename,
+            path: att.path
+          }));
         }
 
-        const data = await resend.emails.send(resendPayload);
-        if (data.error) {
-           throw new Error(data.error.message);
-        }
-
-        return { success: true, mode: 'RESEND' };
+        const info = await transporter.sendMail(nodemailerPayload);
+        console.log('Email sent: %s', info.messageId);
+        return { success: true, mode: 'NODEMAILER' };
       } else {
         console.log('\n==================================================');
         console.log(`MOCK EMAIL SENT TO: ${mailOptions.to}`);
@@ -69,26 +71,31 @@ async function sendMailWithRetry(mailOptions, retries = 3) {
  */
 function getBaseTemplate(content) {
   return `
-    <div style="font-family: Arial, sans-serif; max-width: 650px; margin: 0 auto; background-color: #f8fafc; padding: 20px;">
-      <div style="background-color: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+    <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f0f1e; padding: 40px 20px; text-align: center;">
+      <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.2); text-align: left;">
+        
         <!-- Header -->
-        <div style="background-color: #2563eb; padding: 24px; text-align: center; color: white;">
-          <h1 style="margin: 0; font-size: 24px; font-weight: bold; letter-spacing: 1px;">
-            📘 Counselling Is Easy 4U
+        <div style="background: linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%); padding: 32px 24px; text-align: center;">
+          <h1 style="margin: 0; font-size: 28px; font-weight: 800; color: #ffffff; letter-spacing: 0.5px;">
+            ✨ Counselling Is Easy 4U
           </h1>
+          <p style="margin: 10px 0 0 0; color: #e2e8f0; font-size: 15px;">Empowering your higher education decisions</p>
         </div>
         
         <!-- Content -->
-        <div style="padding: 32px 24px; color: #1e293b; line-height: 1.6;">
+        <div style="padding: 40px 32px; color: #334155; line-height: 1.8; font-size: 16px;">
           ${content}
         </div>
         
         <!-- Footer -->
-        <div style="background-color: #f1f5f9; padding: 24px; text-align: center; border-top: 1px solid #e2e8f0; color: #64748b; font-size: 14px;">
-          <p style="margin: 0 0 8px 0; font-weight: bold; color: #475569;">Need help?</p>
-          <p style="margin: 0 0 16px 0;">📧 <a href="mailto:counsellingiseasy4u@gmail.com" style="color: #2563eb; text-decoration: none;">counsellingiseasy4u@gmail.com</a></p>
-          <p style="margin: 0; font-size: 12px;">Copyright © 2026 Counselling Is Easy 4U</p>
+        <div style="background-color: #f8fafc; padding: 32px 24px; text-align: center; border-top: 1px solid #e2e8f0;">
+          <p style="margin: 0 0 12px 0; font-weight: 600; color: #475569; font-size: 15px;">We're here to help you succeed.</p>
+          <div style="margin: 16px 0;">
+            <a href="mailto:counsellingiseasy4u@gmail.com" style="display: inline-block; background-color: #7c3aed; color: #ffffff; text-decoration: none; padding: 10px 24px; border-radius: 8px; font-weight: bold; font-size: 14px;">Contact Support</a>
+          </div>
+          <p style="margin: 24px 0 0 0; color: #94a3b8; font-size: 12px;">© ${new Date().getFullYear()} Counselling Is Easy 4U. All rights reserved.</p>
         </div>
+        
       </div>
     </div>
   `;
@@ -100,16 +107,16 @@ function getBaseTemplate(content) {
 async function sendOTP(email, name, otp) {
   const studentName = name || 'Student';
   const content = `
-    <h2 style="color: #0f172a; margin-top: 0;">Verify Your Email</h2>
-    <p style="font-size: 16px;">Hello ${studentName},</p>
-    <p style="font-size: 16px;">Your verification code is:</p>
-    <div style="text-align: center; margin: 32px 0;">
-      <span style="font-size: 32px; font-weight: bold; letter-spacing: 8px; color: #2563eb; background-color: #eff6ff; padding: 16px 32px; border-radius: 8px; border: 2px dashed #bfdbfe; display: inline-block;">
+    <h2 style="color: #1e293b; margin-top: 0; font-size: 22px;">Verify Your Email Address</h2>
+    <p style="font-size: 16px;">Hello <strong>${studentName}</strong>,</p>
+    <p style="font-size: 16px;">Welcome to Counselling Is Easy 4U! To continue with your college prediction, please use the verification code below:</p>
+    <div style="text-align: center; margin: 40px 0;">
+      <span style="font-size: 36px; font-weight: 800; letter-spacing: 12px; color: #7c3aed; background-color: #f3e8ff; padding: 20px 40px; border-radius: 12px; border: 2px dashed #c084fc; display: inline-block; margin-left: 12px;">
         ${otp}
       </span>
     </div>
-    <p style="font-size: 16px;">This OTP expires in <strong>10 minutes</strong>.</p>
-    <p style="font-size: 14px; color: #64748b;">If you did not request this code, ignore this email.</p>
+    <p style="font-size: 16px; color: #475569;">This code will expire in <strong>10 minutes</strong>.</p>
+    <p style="font-size: 14px; color: #64748b; margin-top: 32px;">If you didn't request this code, you can safely ignore this email.</p>
   `;
 
   const html = getBaseTemplate(content);
@@ -131,22 +138,25 @@ async function sendOTP(email, name, otp) {
 async function sendPredictionResults(email, name, pdfPath) {
   const studentName = name || 'Student';
   const content = `
-    <p style="font-size: 16px;">Hello ${studentName},</p>
-    <p style="font-size: 16px;">Thank you for using Counselling Is Easy 4U.</p>
-    <p style="font-size: 16px;">Your personalized prediction report has been generated successfully.</p>
-    <p style="font-size: 16px;">The attached PDF includes:</p>
-    <ul style="font-size: 16px; color: #334155; line-height: 1.8;">
-      <li>Dream Colleges</li>
-      <li>Realistic Colleges</li>
-      <li>Safe Colleges</li>
-      <li>Trend Analysis</li>
-      <li>Choice Filling Guidance</li>
-    </ul>
-    <p style="font-size: 16px; margin-top: 24px;">If you need counseling support, contact us anytime.</p>
-    <p style="font-size: 16px;">📧 <a href="mailto:counsellingiseasy4u@gmail.com" style="color: #2563eb; text-decoration: none;">counsellingiseasy4u@gmail.com</a></p>
+    <h2 style="color: #1e293b; margin-top: 0; font-size: 22px;">Your College Journey Starts Here! 🚀</h2>
+    <p style="font-size: 16px;">Hi <strong>${studentName}</strong>,</p>
+    <p style="font-size: 16px;">We are thrilled to share your personalized college prediction report! Our AI-driven system has thoroughly analyzed your profile against historical cutoffs to find the best possible matches for you.</p>
+    
+    <div style="background-color: #f1f5f9; border-left: 4px solid #7c3aed; padding: 16px; margin: 24px 0; border-radius: 0 8px 8px 0;">
+      <h3 style="margin: 0 0 8px 0; color: #0f172a; font-size: 16px;">Inside your attached PDF, you'll find:</h3>
+      <ul style="margin: 0; padding-left: 20px; color: #475569;">
+        <li style="margin-bottom: 8px;"><strong>✨ Dream Colleges:</strong> Top-tier institutions you should aspire to.</li>
+        <li style="margin-bottom: 8px;"><strong>🎯 Realistic Colleges:</strong> Your most probable and solid matches.</li>
+        <li style="margin-bottom: 8px;"><strong>🛡️ Safe Colleges:</strong> Excellent fallback options to secure your future.</li>
+        <li style="margin-bottom: 0;"><strong>📊 Trend Analysis & Choice Filling Guidance:</strong> Strategies to maximize your chances.</li>
+      </ul>
+    </div>
+
+    <p style="font-size: 16px;">Please find your comprehensive <strong>Prediction Report PDF attached</strong> to this email. We recommend reviewing it carefully as you prepare for your counseling rounds.</p>
+    <p style="font-size: 16px; margin-top: 24px;">Wishing you the absolute best for your admission process! If you need expert guidance for choice filling, feel free to reach out to us.</p>
     <br/>
-    <p style="font-size: 16px; margin: 0;">Regards,</p>
-    <p style="font-size: 16px; font-weight: bold; margin: 4px 0 0 0;">Counselling Is Easy 4U</p>
+    <p style="font-size: 16px; margin: 0;">Warm Regards,</p>
+    <p style="font-size: 16px; font-weight: bold; margin: 4px 0 0 0; color: #7c3aed;">The Counselling Is Easy 4U Team</p>
   `;
 
   const html = getBaseTemplate(content);
