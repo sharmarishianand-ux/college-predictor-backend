@@ -1,4 +1,4 @@
-const { Leads, Cutoffs, Otps, Predictions } = require('../config/db');
+const { Leads, Cutoffs, Otps, Predictions, Books } = require('../config/db');
 const { sendOTP, sendPredictionResults, sendAdminNotificationEmail, sendContactFormEmail } = require('../services/emailService');
 const { generatePredictionPDF } = require('../services/pdfService');
 const jwt = require('jsonwebtoken');
@@ -14,9 +14,32 @@ function generateOtpCode() {
  * Send Verification OTP
  */
 async function handleSendOTP(req, res) {
-  const { email, name } = req.body;
+  const { email, name, bookId } = req.body;
   if (!email) {
     return res.status(400).json({ message: 'Email is required' });
+  }
+  
+  if (bookId) {
+    try {
+      const book = await Books.findOne({ bookId });
+      if (!book) {
+        return res.status(400).json({ message: 'Invalid Book ID' });
+      }
+      if (book.status === 'Deactivated' || book.status === 'Expired') {
+        return res.status(400).json({ message: 'This Book ID is no longer active.' });
+      }
+      if (book.status === 'Active' && book.studentEmail !== email) {
+        return res.status(400).json({ message: 'This Book ID is already registered to another student.' });
+      }
+      if (book.status === 'Active' && book.remainingPredictions <= 0) {
+        return res.status(403).json({ message: 'You have used all prediction attempts included with this Book.' });
+      }
+    } catch (e) {
+      console.error('Book validation error:', e);
+      return res.status(500).json({ message: 'Error validating Book ID' });
+    }
+  } else {
+    return res.status(400).json({ message: 'Book ID is required' });
   }
 
   try {
@@ -99,7 +122,8 @@ async function predictCollegesHelper({
   quota,
   academicProgram,
   state,
-  examAppeared
+  examAppeared,
+  instituteType
 }) {
   const studentCrl = Number(crlRank);
   if (isNaN(studentCrl)) return [];
@@ -111,8 +135,10 @@ async function predictCollegesHelper({
     queryObj.seatType = seatType;
   }
   
-  // Exclude IITs if candidate only appeared for JEE Main
-  if (examAppeared === 'JEE Main Only') {
+  // Exclude IITs if candidate only appeared for JEE Main, or filter by specific instituteType
+  if (instituteType && instituteType !== 'ALL' && instituteType !== 'all') {
+    queryObj.instituteType = instituteType;
+  } else if (examAppeared === 'JEE Main Only') {
     queryObj.instituteType = { $ne: 'IIT' };
   }
 
@@ -133,7 +159,9 @@ async function predictCollegesHelper({
     const fallbackQuery = {
       seatType: 'OPEN'
     };
-    if (examAppeared === 'JEE Main Only') {
+    if (instituteType && instituteType !== 'ALL' && instituteType !== 'all') {
+      fallbackQuery.instituteType = instituteType;
+    } else if (examAppeared === 'JEE Main Only') {
       fallbackQuery.instituteType = { $ne: 'IIT' };
     }
     if (gender) {
@@ -145,34 +173,18 @@ async function predictCollegesHelper({
     allCutoffs = await Cutoffs.find(fallbackQuery);
   }
 
-  const results = [];
-
+  // Group by (collegeName, branch, quota, seatType, gender) to merge 2023, 2024, 2025 cutoffs
+  const groups = new Map();
   allCutoffs.forEach(item => {
-    const isOpenSeat = item.seatType === 'OPEN' || item.seatType === 'OPEN (PwD)';
-    const compareRank = isOpenSeat ? studentCrl : studentCategoryRank;
-    
-    // Calculate Rank Boundaries
-    const dreamRankMin = compareRank * 0.80; // Rank - 20%
-    const realisticMin = compareRank * 0.90; // Rank - 10%
-    const realisticMax = compareRank * 1.10; // Rank + 10%
-    const safeRank = compareRank * 1.30;     // Rank + 30%
-
-    // Categorization Logic
-    let category = null;
-    if (item.closingRank >= dreamRankMin && item.closingRank < realisticMin) {
-      category = 'DREAM';
-    } else if (item.closingRank >= realisticMin && item.closingRank <= realisticMax) {
-      category = 'REALISTIC';
-    } else if (item.closingRank >= safeRank) {
-      category = 'SAFE';
-    }
-
-    if (!category) return; // Filter out out-of-reach colleges
-
     // Filter by academicProgram (Preferred Branch)
-    if (academicProgram && academicProgram !== 'ALL BRANCHES' && academicProgram !== 'all') {
-      const branchMatch = item.branch.toLowerCase().includes(academicProgram.toLowerCase());
-      if (!branchMatch) return;
+    if (academicProgram && academicProgram !== 'ALL BRANCHES' && academicProgram !== 'all' && academicProgram !== 'ALL' && (!Array.isArray(academicProgram) || academicProgram.length > 0)) {
+      if (Array.isArray(academicProgram)) {
+        const branchMatch = academicProgram.some(p => item.branch.toLowerCase().includes(p.toLowerCase()));
+        if (!branchMatch) return;
+      } else {
+        const branchMatch = item.branch.toLowerCase().includes(academicProgram.toLowerCase());
+        if (!branchMatch) return;
+      }
     }
 
     // Filter by State if a specific state is requested
@@ -180,18 +192,99 @@ async function predictCollegesHelper({
       if (!item.state || item.state.toLowerCase() !== state.toLowerCase()) return;
     }
 
+    const key = `${item.collegeName}|${item.branch}|${item.quota}|${item.seatType}|${item.gender}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        collegeName: item.collegeName,
+        branch: item.branch,
+        quota: item.quota,
+        seatType: item.seatType,
+        gender: item.gender,
+        instituteType: item.instituteType,
+        state: item.state || '',
+        location: item.location || '',
+        years: {}
+      });
+    }
+    const group = groups.get(key);
+    const yearKey = item.year || 2025;
+    group.years[yearKey] = {
+      closingRank: item.closingRank,
+      openingRank: item.openingRank
+    };
+  });
+
+  const results = [];
+
+  for (const group of groups.values()) {
+    const closingRank2025 = group.years[2025]?.closingRank;
+    const closingRank2024 = group.years[2024]?.closingRank;
+    const closingRank2023 = group.years[2023]?.closingRank;
+    
+    const openingRank2025 = group.years[2025]?.openingRank || 0;
+    const openingRank2024 = group.years[2024]?.openingRank || 0;
+    const openingRank2023 = group.years[2023]?.openingRank || 0;
+
+    // Use latest available year for baseline closing/opening rank (2025, then 2024, then 2023)
+    const baseClosingRank = closingRank2025 || closingRank2024 || closingRank2023;
+    const baseOpeningRank = openingRank2025 || openingRank2024 || openingRank2023;
+
+    if (!baseClosingRank) continue;
+
+    const isOpenSeat = group.seatType === 'OPEN' || group.seatType === 'OPEN (PwD)';
+    const compareRank = isOpenSeat ? studentCrl : studentCategoryRank;
+
+    // Categorization logic:
+    // Dream: Student Rank -20% (cutoff rank is between 80% and 90% of student's rank)
+    // Realistic: Student Rank ±10% (cutoff rank is between 90% and 110% of student's rank)
+    // Safe: Student Rank +30% (cutoff rank is between 110% and 130% of student's rank)
+    let category = null;
+    if (baseClosingRank >= compareRank * 0.60 && baseClosingRank < compareRank * 0.90) {
+      category = 'DREAM';
+    } else if (baseClosingRank >= compareRank * 0.90 && baseClosingRank <= compareRank * 1.10) {
+      category = 'REALISTIC';
+    } else if (baseClosingRank > compareRank * 1.10) {
+      category = 'SAFE';
+    }
+
+    if (!category) continue; // Out of reach or not within boundaries
+
+    // Calculate Average closing rank
+    const validRanks = [closingRank2025, closingRank2024, closingRank2023].filter(r => r !== undefined && r !== null && !isNaN(r));
+    const averageRank = validRanks.length > 0 ? Math.round(validRanks.reduce((sum, val) => sum + val, 0) / validRanks.length) : baseClosingRank;
+
+    // Calculate Trend
+    let trend = 'Stable';
+    if (closingRank2025 && closingRank2024) {
+      if (closingRank2025 > closingRank2024) trend = 'Easier';
+      else if (closingRank2025 < closingRank2024) trend = 'Harder';
+    } else if (closingRank2025 && closingRank2023) {
+      if (closingRank2025 > closingRank2023) trend = 'Easier';
+      else if (closingRank2025 < closingRank2023) trend = 'Harder';
+    } else if (closingRank2024 && closingRank2023) {
+      if (closingRank2024 > closingRank2023) trend = 'Easier';
+      else if (closingRank2024 < closingRank2023) trend = 'Harder';
+    }
+
     results.push({
-      _id: item._id,
-      collegeName: item.collegeName,     // Institute Name
-      branch: item.branch,               // Academic Program Name
-      quota: item.quota,                 // Quota
-      seatType: item.seatType,           // Seat Type
-      gender: item.gender,               // Gender
-      openingRank: item.openingRank,     // Opening Rank
-      closingRank: item.closingRank,     // Closing Rank
+      collegeName: group.collegeName,
+      branch: group.branch,
+      quota: group.quota,
+      seatType: group.seatType,
+      gender: group.gender,
+      instituteType: group.instituteType,
+      state: group.state,
+      location: group.location,
+      openingRank: baseOpeningRank,
+      closingRank: baseClosingRank,
+      closingRank2025: closingRank2025 || '-',
+      closingRank2024: closingRank2024 || '-',
+      closingRank2023: closingRank2023 || '-',
+      averageRank,
+      trend,
       predictionCategory: category
     });
-  });
+  }
 
   // Sort by closingRank ascending (best rank first)
   results.sort((a, b) => a.closingRank - b.closingRank);
@@ -215,13 +308,15 @@ async function handlePredictColleges(req, res) {
     academicProgram,
     email,
     gender,
-    state
+    state,
+    instituteType,
+    bookId
   } = req.body;
 
   // Validation
-  if (!name || !email || !mobileNumber || crlRank === undefined || !seatType) {
-    console.log('Missing fields debug:', { name, email, mobileNumber, crlRank, seatType });
-    return res.status(400).json({ message: 'Required student details are missing' });
+  if (!name || !email || !mobileNumber || crlRank === undefined || !seatType || !bookId) {
+    console.log('Missing fields debug:', { name, email, mobileNumber, crlRank, seatType, bookId });
+    return res.status(400).json({ message: 'Required student details or Book ID are missing' });
   }
 
   // Validate phone number: must be exactly 10 digits
@@ -245,6 +340,16 @@ async function handlePredictColleges(req, res) {
       }
     }
 
+    const book = await Books.findOne({ bookId });
+    if (!book) return res.status(400).json({ message: 'Invalid Book ID' });
+    if (book.status === 'Deactivated' || book.status === 'Expired') return res.status(400).json({ message: 'This Book ID is no longer active.' });
+    if (book.status === 'Active' && book.studentEmail !== email) {
+      return res.status(400).json({ message: 'This Book ID is already registered to another student.' });
+    }
+    if (book.remainingPredictions <= 0) {
+      return res.status(403).json({ message: 'You have used all prediction attempts included with this Book.' });
+    }
+
     const studentCrl = Number(crlRank);
     const studentCategoryRank = categoryRank ? Number(categoryRank) : studentCrl;
 
@@ -258,7 +363,7 @@ async function handlePredictColleges(req, res) {
       rollNumber: uniqueCode || '',
       uniqueCode: uniqueCode || '',
       quota,
-      instituteTypes: ['ALL'],
+      instituteTypes: instituteType ? [instituteType] : ['ALL'],
       academicProgram,
       gender,
       category: seatType,
@@ -286,7 +391,8 @@ async function handlePredictColleges(req, res) {
       quota,
       academicProgram,
       state,
-      examAppeared: examAppeared || 'JEE Main Only'
+      examAppeared: examAppeared || 'JEE Main Only',
+      instituteType
     });
 
     const dreamColleges = predictions.filter(p => p.predictionCategory === 'DREAM');
@@ -314,15 +420,21 @@ async function handlePredictColleges(req, res) {
       name,
       email,
       mobileNumber,
+      uniqueCode: uniqueCode || '',
       crlRank: studentCrl,
       category: seatType,
       quota,
       gender,
+      instituteType: instituteType || 'ALL',
+      academicProgram,
       examAppeared: examAppeared || 'JEE Main Only',
       inputRank: studentCrl,
       dreamCount: dreamColleges.length,
       realisticCount: realisticColleges.length,
       safeCount: safeColleges.length,
+      dreamColleges,
+      realisticColleges,
+      safeColleges,
       pdfFilename: filename,
       emailStatus: 'Pending'
     });
@@ -341,14 +453,27 @@ async function handlePredictColleges(req, res) {
       await Predictions.findByIdAndUpdate(predictionRecord._id, { emailStatus: 'Failed' });
     });
 
+    // Update Book ID usage
+    await Books.findByIdAndUpdate(book._id, {
+      status: 'Active',
+      studentName: name,
+      studentEmail: email,
+      studentMobile: mobileNumber,
+      activationDate: book.activationDate || new Date(),
+      lastUsed: new Date(),
+      predictionsUsed: (book.predictionsUsed || 0) + 1,
+      remainingPredictions: Math.max(0, (book.remainingPredictions || 20) - 1)
+    });
+
     return res.json({
       message: 'Colleges predicted successfully',
       predictions,
-      emailSent: true
+      emailSent: true,
+      remainingPredictions: Math.max(0, (book.remainingPredictions || 20) - 1)
     });
   } catch (error) {
     console.error('Error predicting colleges:', error);
-    return res.status(500).json({ message: 'Error predicting colleges' });
+    return res.status(500).json({ message: 'Error predicting colleges: ' + error.message });
   }
 }
 
@@ -401,16 +526,21 @@ async function handleGetStudentProfile(req, res) {
     // Run prediction helper using student profile details
     const predictions = await predictCollegesHelper({
       crlRank: student.crlRank,
+      categoryRank: student.categoryRank || student.crlRank,
       seatType: student.seatType || student.category,
       gender: student.gender,
       quota: student.quota,
       academicProgram: student.academicProgram || student.preferredBranch,
-      examAppeared: student.examAppeared || 'JEE Main Only'
+      examAppeared: student.examAppeared || 'JEE Main Only',
+      instituteType: student.instituteTypes && student.instituteTypes.length ? student.instituteTypes[0] : 'ALL'
     });
+
+    const history = await Predictions.find({ email });
 
     return res.json({
       profile: student,
-      predictions
+      predictions,
+      history
     });
   } catch (error) {
     console.error('Error fetching student profile:', error);
@@ -466,12 +596,31 @@ function verifyStudentToken(req, res, next) {
   }
 }
 
+/**
+ * Get distinct branches
+ */
+async function handleGetBranches(req, res) {
+  try {
+    const cutoffs = await Cutoffs.find({});
+    const uniqueBranches = new Set();
+    cutoffs.forEach(c => {
+      if (c.branch) uniqueBranches.add(c.branch);
+    });
+    return res.json({ branches: Array.from(uniqueBranches).sort() });
+  } catch (error) {
+    console.error('Error fetching branches:', error);
+    return res.status(500).json({ message: 'Error fetching branches' });
+  }
+}
+
 module.exports = {
+  predictCollegesHelper,
   handleSendOTP,
   handleVerifyOTP,
   handlePredictColleges,
   handleStudentLogin,
   handleGetStudentProfile,
   handleContactFormSubmit,
-  verifyStudentToken
+  verifyStudentToken,
+  handleGetBranches
 };
