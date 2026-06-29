@@ -7,7 +7,7 @@ if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
 }
 
-// Define custom fonts with standard Helvetica
+// Define custom fonts with standard Helvetica fallback
 const fonts = {
   Helvetica: {
     normal: 'Helvetica',
@@ -16,6 +16,18 @@ const fonts = {
     bolditalics: 'Helvetica-BoldOblique'
   }
 };
+
+const regularFontPath = path.join(__dirname, '../fonts/NotoSansDevanagari-Regular.ttf');
+const boldFontPath = path.join(__dirname, '../fonts/NotoSansDevanagari-Bold.ttf');
+
+if (fs.existsSync(regularFontPath) && fs.existsSync(boldFontPath)) {
+  fonts.NotoSansDevanagari = {
+    normal: regularFontPath,
+    bold: boldFontPath,
+    italics: regularFontPath,
+    bolditalics: boldFontPath
+  };
+}
 
 pdfmake.setFonts(fonts);
 
