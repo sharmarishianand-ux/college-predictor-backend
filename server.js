@@ -12,7 +12,8 @@ const {
   handleStudentLogin,
   handleGetStudentProfile,
   handleContactFormSubmit,
-  verifyStudentToken
+  verifyStudentToken,
+  handleGetBranches
 } = require('./controllers/studentController');
 
 const {
@@ -28,12 +29,24 @@ const {
   handleGetCutoffYears,
   handleGetStats,
   handleGetPredictions,
+  handleUpdatePrediction,
   handleExportPredictions,
   handleResendPredictionEmail,
-  handleDeletePrediction
+  handleDeletePrediction,
+  handleDeleteStudent,
+  handleBulkDeleteStudents,
+  handleDeleteAllStudents,
+  handleBulkDeletePredictions,
+  handleDeleteAllPredictions,
+  handleBulkDeleteColleges,
+  handleDeleteAllColleges,
+  handleDeleteUpload,
+  handleDeleteCutoffYear
 } = require('./controllers/adminController');
 
 const { checkConnectionStatus, initAdmin } = require('./config/db');
+
+const bookRoutes = require('./routes/bookRoutes');
 
 // Ensure uploads folder exists
 const UPLOADS_DIR = path.join(__dirname, 'uploads');
@@ -92,6 +105,7 @@ app.post('/api/predict', handlePredictColleges);
 app.post('/api/student/login', handleStudentLogin);
 app.get('/api/student/profile', verifyStudentToken, handleGetStudentProfile);
 app.post('/api/contact', handleContactFormSubmit);
+app.get('/api/branches', handleGetBranches);
 
 // ==========================================
 // ADMIN PATHS
@@ -106,12 +120,32 @@ app.get('/api/admin/colleges', verifyToken, handleGetColleges);
 app.post('/api/admin/colleges', verifyToken, handleCreateCollege);
 app.put('/api/admin/colleges/:id', verifyToken, handleUpdateCollege);
 app.delete('/api/admin/colleges/:id', verifyToken, handleDeleteCollege);
+
+// Cutoff Endpoints
 app.post('/api/admin/cutoff/upload', verifyToken, upload.single('file'), handleUploadCutoffs);
 app.get('/api/admin/cutoff/years', verifyToken, handleGetCutoffYears);
+app.delete('/api/admin/cutoff/year/:year', verifyToken, handleDeleteCutoffYear);
+
 app.get('/api/admin/predictions', verifyToken, handleGetPredictions);
 app.get('/api/admin/predictions/export', verifyToken, handleExportPredictions);
+app.delete('/api/admin/predictions/all', verifyToken, handleDeleteAllPredictions);
+app.delete('/api/admin/predictions/bulk', verifyToken, handleBulkDeletePredictions);
+app.put('/api/admin/predictions/:id', verifyToken, handleUpdatePrediction);
 app.post('/api/admin/predictions/:id/resend-email', verifyToken, handleResendPredictionEmail);
 app.delete('/api/admin/predictions/:id', verifyToken, handleDeletePrediction);
+
+// Additional Student Delete Routes (specific before wildcard)
+app.delete('/api/admin/students/all', verifyToken, handleDeleteAllStudents);
+app.delete('/api/admin/students/bulk', verifyToken, handleBulkDeleteStudents);
+app.delete('/api/admin/students/:email', verifyToken, handleDeleteStudent);
+
+// College Delete Routes (specific before wildcard)
+app.delete('/api/admin/colleges/all', verifyToken, handleDeleteAllColleges);
+app.delete('/api/admin/colleges/bulk', verifyToken, handleBulkDeleteColleges);
+
+app.delete('/api/admin/uploads/:filename', verifyToken, handleDeleteUpload);
+
+app.use('/api/admin/books', bookRoutes);
 
 // Root path fallback
 app.get('/', (req, res) => {
