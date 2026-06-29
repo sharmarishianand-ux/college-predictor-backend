@@ -9,10 +9,11 @@ const EMAIL_FROM = `Counselling Is Easy 4U <${EMAIL_USER}>`;
 
 let transporter = null;
 if (EMAIL_USER && EMAIL_PASS) {
+  const port = EMAIL_PORT || 587;
   transporter = nodemailer.createTransport({
     host: EMAIL_HOST || 'smtp.gmail.com',
-    port: EMAIL_PORT || 587,
-    secure: false, // true for 465, false for other ports
+    port: port,
+    secure: port == 465, // true for 465, false for other ports
     auth: {
       user: EMAIL_USER,
       pass: EMAIL_PASS,
