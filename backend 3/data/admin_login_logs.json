@@ -1,0 +1,106 @@
+[
+  {
+    "_id": "1782395730716c88rs",
+    "createdAt": "2026-06-25T13:55:30.716Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin@collegepredictor.com"
+  },
+  {
+    "_id": "1782395730733z90b0",
+    "createdAt": "2026-06-25T13:55:30.733Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin@collegepredictor.com"
+  },
+  {
+    "_id": "1782395730748wlx7e",
+    "createdAt": "2026-06-25T13:55:30.748Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin@collegepredictor.com"
+  },
+  {
+    "_id": "1782395730762k34pc",
+    "createdAt": "2026-06-25T13:55:30.762Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin@collegepredictor.com"
+  },
+  {
+    "_id": "1782395730774a5laf",
+    "createdAt": "2026-06-25T13:55:30.774Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin@collegepredictor.com"
+  },
+  {
+    "_id": "1782395730792ggpq4",
+    "createdAt": "2026-06-25T13:55:30.792Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin@collegepredictor.com"
+  },
+  {
+    "_id": "1782395750811j728v",
+    "createdAt": "2026-06-25T13:55:50.811Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin"
+  },
+  {
+    "_id": "1782395750832vu2e9",
+    "createdAt": "2026-06-25T13:55:50.832Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin"
+  },
+  {
+    "_id": "17823957508467kpma",
+    "createdAt": "2026-06-25T13:55:50.846Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin"
+  },
+  {
+    "_id": "1782395750863c4pqg",
+    "createdAt": "2026-06-25T13:55:50.863Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin"
+  },
+  {
+    "_id": "1782395750881vywg0",
+    "createdAt": "2026-06-25T13:55:50.881Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin"
+  },
+  {
+    "_id": "1782395750897vv2zs",
+    "createdAt": "2026-06-25T13:55:50.897Z",
+    "ipAddress": "::1",
+    "userAgent": "curl/8.7.1",
+    "status": "Failed",
+    "username": "admin"
+  },
+  {
+    "_id": "1782395834880lkqmp",
+    "createdAt": "2026-06-25T13:57:14.880Z",
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15",
+    "status": "Success",
+    "username": "admin"
+  }
+]
