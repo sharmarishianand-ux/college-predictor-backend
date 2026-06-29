@@ -1,27 +1,16 @@
-const nodemailer = require('nodemailer');
+const { Resend } = require('resend');
 const fs = require('fs');
 
-const EMAIL_HOST = process.env.EMAIL_HOST;
-const EMAIL_PORT = process.env.EMAIL_PORT;
-const EMAIL_USER = process.env.EMAIL_USER;
-const EMAIL_PASS = process.env.EMAIL_PASS;
-const EMAIL_FROM = `Counselling Is Easy 4U <${EMAIL_USER}>`;
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// Resend requires sending from a verified domain, OR 'onboarding@resend.dev' for testing.
+const EMAIL_FROM = process.env.EMAIL_FROM || 'onboarding@resend.dev';
 
-let transporter = null;
-if (EMAIL_USER && EMAIL_PASS) {
-  const port = EMAIL_PORT || 587;
-  transporter = nodemailer.createTransport({
-    host: EMAIL_HOST || 'smtp.gmail.com',
-    port: port,
-    secure: port == 465, // true for 465, false for other ports
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASS,
-    },
-  });
-  console.log('Nodemailer email API configured.');
+let resendClient = null;
+if (RESEND_API_KEY) {
+  resendClient = new Resend(RESEND_API_KEY);
+  console.log('Resend email API configured.');
 } else {
-  console.log('No Nodemailer configuration found. Running email service in MOCK mode (emails print to console).');
+  console.log('No RESEND_API_KEY found. Running email service in MOCK mode (emails print to console).');
 }
 
 /**
@@ -30,24 +19,29 @@ if (EMAIL_USER && EMAIL_PASS) {
 async function sendMailWithRetry(mailOptions, retries = 3) {
   for (let i = 0; i < retries; i++) {
     try {
-      if (transporter) {
-        const nodemailerPayload = {
-          from: EMAIL_FROM,
+      if (resendClient) {
+        const resendPayload = {
+          from: `Counselling Is Easy 4U <${EMAIL_FROM}>`,
           to: mailOptions.to,
           subject: mailOptions.subject,
           html: mailOptions.html
         };
 
         if (mailOptions.attachments && mailOptions.attachments.length > 0) {
-          nodemailerPayload.attachments = mailOptions.attachments.map(att => ({
+          resendPayload.attachments = mailOptions.attachments.map(att => ({
             filename: att.filename,
-            path: att.path
+            content: fs.readFileSync(att.path) // Resend accepts Buffer
           }));
         }
 
-        const info = await transporter.sendMail(nodemailerPayload);
-        console.log('Email sent: %s', info.messageId);
-        return { success: true, mode: 'NODEMAILER' };
+        const { data, error } = await resendClient.emails.send(resendPayload);
+        
+        if (error) {
+          throw new Error(error.message);
+        }
+        
+        console.log('Email sent via Resend:', data?.id);
+        return { success: true, mode: 'RESEND' };
       } else {
         console.log('\n==================================================');
         console.log(`MOCK EMAIL SENT TO: ${mailOptions.to}`);
