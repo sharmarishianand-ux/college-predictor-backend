@@ -1,0 +1,23 @@
+[
+  {
+    "_id": "1781854204445dq5rk",
+    "createdAt": "2026-06-19T07:30:04.445Z",
+    "email": "rishi@gmail.com",
+    "otp": "456303",
+    "expiresAt": "2026-06-19T07:40:04.443Z"
+  },
+  {
+    "_id": "1782390582733bpesd",
+    "createdAt": "2026-06-25T12:29:42.733Z",
+    "email": "sharmarishi@gmail.com",
+    "otp": "848581",
+    "expiresAt": "2026-06-25T12:39:42.732Z"
+  },
+  {
+    "_id": "1782391828190im4y5",
+    "createdAt": "2026-06-25T12:50:28.190Z",
+    "email": "gopalmgs@yahoo.com",
+    "otp": "401957",
+    "expiresAt": "2026-06-25T13:00:28.189Z"
+  }
+]
