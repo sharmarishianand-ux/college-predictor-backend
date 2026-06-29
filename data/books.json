@@ -1,0 +1,175 @@
+[
+  {
+    "_id": "1782716225020epb09",
+    "bookId": "BOOK001",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020qw7vx",
+    "bookId": "BOOK002",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020u3ryl",
+    "bookId": "BOOK003",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020x1sjn",
+    "bookId": "BOOK004",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020y4s03",
+    "bookId": "BOOK005",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020xwfqx",
+    "bookId": "BOOK006",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020mpf5k",
+    "bookId": "BOOK007",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020a8d7v",
+    "bookId": "BOOK008",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020etctx",
+    "bookId": "BOOK009",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020evzlx",
+    "bookId": "BOOK010",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020q96pr",
+    "bookId": "BOOK011",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020facpm",
+    "bookId": "BOOK012",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020jvuvv",
+    "bookId": "BOOK013",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020k7og5",
+    "bookId": "BOOK014",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020hewr2",
+    "bookId": "BOOK015",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020cbu0h",
+    "bookId": "BOOK016",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020kia44",
+    "bookId": "BOOK017",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020fep45",
+    "bookId": "BOOK018",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020chn8l",
+    "bookId": "BOOK019",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "1782716225020zq4xq",
+    "bookId": "BOOK020",
+    "status": "Unused",
+    "predictionLimit": 20,
+    "predictionsUsed": 0,
+    "remainingPredictions": 20
+  },
+  {
+    "_id": "test_book_1",
+    "bookId": "book1",
+    "status": "Active",
+    "predictionLimit": 50,
+    "predictionsUsed": 14,
+    "remainingPredictions": 36,
+    "studentName": "Rishi",
+    "studentEmail": "sharmarishianand@gmail.com",
+    "studentMobile": "6543273456",
+    "activationDate": "2026-06-29T11:05:39.042Z",
+    "lastUsed": "2026-06-29T17:18:58.166Z"
+  }
+]

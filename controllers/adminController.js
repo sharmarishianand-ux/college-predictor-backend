@@ -577,14 +577,14 @@ async function handleUploadCutoffs(req, res) {
       });
     }
 
-    // Merge all datasets and deduplicate by key: collegeName|branch|quota|seatType|gender
+    // Merge all datasets and deduplicate by key: collegeName|branch|quota|seatType|gender|year
     const existingCutoffs = await Cutoffs.find({});
     const allCutoffs = [...existingCutoffs, ...results];
     
     const deduplicatedMap = new Map();
     allCutoffs.forEach(c => {
       // Create a unique key for deduplication
-      const key = `${(c.collegeName||'').toLowerCase()}|${(c.branch||'').toLowerCase()}|${(c.quota||'').toLowerCase()}|${(c.seatType||'').toLowerCase()}|${(c.gender||'').toLowerCase()}`;
+      const key = `${(c.collegeName||'').toLowerCase()}|${(c.branch||'').toLowerCase()}|${(c.quota||'').toLowerCase()}|${(c.seatType||'').toLowerCase()}|${(c.gender||'').toLowerCase()}|${c.year}`;
       
       // Since 'results' (new uploads) are appended after 'existingCutoffs', 
       // setting it in the map will overwrite older duplicates with newer ones.
@@ -688,6 +688,11 @@ async function handleGetStats(req, res) {
       .sort((a, b) => Number(a._id) - Number(b._id));
 
     const recentLeads = allLeads.slice(0, 5);
+    
+    // Add recent predictions for the dashboard table
+    const allPredictions = await Predictions.find({});
+    allPredictions.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const recentPredictions = allPredictions.slice(0, 5);
 
     return res.json({
       totalLeads,
@@ -695,7 +700,8 @@ async function handleGetStats(req, res) {
       uniqueColleges,
       categoryDistribution,
       yearDistribution,
-      recentLeads
+      recentLeads,
+      recentPredictions
     });
   } catch (error) {
     console.error('Error fetching stats:', error);
@@ -806,6 +812,151 @@ async function handleResendPredictionEmail(req, res) {
 }
 
 /**
+ * Update Student Prediction Details & Re-calculate prediction and regenerate PDF
+ */
+async function handleUpdatePrediction(req, res) {
+  const { id } = req.params;
+  const {
+    name,
+    email,
+    mobileNumber,
+    uniqueCode,
+    crlRank,
+    categoryRank,
+    category, // seatType
+    quota,
+    gender,
+    examAppeared,
+    academicProgram,
+    state
+  } = req.body;
+
+  if (!name || !email || crlRank === undefined || !category) {
+    return res.status(400).json({ message: 'Name, email, CRL rank and category are required' });
+  }
+
+  try {
+    const studentCrl = Number(crlRank);
+    const studentCategoryRank = categoryRank ? Number(categoryRank) : studentCrl;
+
+    // Find the existing prediction record
+    const predictionRecord = await Predictions.findOne({ _id: id });
+    if (!predictionRecord) {
+      return res.status(404).json({ message: 'Prediction report not found' });
+    }
+
+    // Also update student profile Lead if it exists
+    let existingLead = await Leads.findOne({ email });
+    const leadData = {
+      name,
+      email,
+      phone: mobileNumber || predictionRecord.mobileNumber || '',
+      mobileNumber: mobileNumber || predictionRecord.mobileNumber || '',
+      rollNumber: uniqueCode || '',
+      uniqueCode: uniqueCode || '',
+      quota,
+      instituteTypes: ['ALL'],
+      academicProgram,
+      gender,
+      category: category,
+      seatType: category,
+      crlRank: studentCrl,
+      categoryRank: studentCategoryRank,
+      examAppeared: examAppeared || 'JEE Main Only',
+      preferredBranch: academicProgram,
+      state: state || 'All States'
+    };
+
+    if (existingLead) {
+      await Leads.findByIdAndUpdate(existingLead._id, leadData);
+    } else {
+      await Leads.create(leadData);
+    }
+
+    // Import prediction helper
+    const { predictCollegesHelper } = require('./studentController');
+    const { generatePredictionPDF } = require('../services/pdfService');
+
+    // Run prediction helper to re-calculate prediction
+    const predictions = await predictCollegesHelper({
+      crlRank: studentCrl,
+      categoryRank: studentCategoryRank,
+      seatType: category,
+      gender,
+      quota,
+      academicProgram,
+      state,
+      examAppeared: examAppeared || 'JEE Main Only'
+    });
+
+    const dreamColleges = predictions.filter(p => p.predictionCategory === 'DREAM');
+    const realisticColleges = predictions.filter(p => p.predictionCategory === 'REALISTIC');
+    const safeColleges = predictions.filter(p => p.predictionCategory === 'SAFE');
+
+    // Generate new PDF
+    const { pdfPath, filename } = await generatePredictionPDF(
+      { 
+        name, 
+        email, 
+        mobileNumber: mobileNumber || predictionRecord.mobileNumber, 
+        crlRank: studentCrl, 
+        category: category, 
+        quota, 
+        gender, 
+        examAppeared: examAppeared || 'JEE Main Only', 
+        state 
+      },
+      { dreamColleges, realisticColleges, safeColleges }
+    );
+
+    // Delete old PDF file if it exists
+    if (predictionRecord.pdfFilename) {
+      const oldPdfPath = path.join(__dirname, '..', 'uploads', 'pdfs', predictionRecord.pdfFilename);
+      if (fs.existsSync(oldPdfPath)) {
+        try {
+          fs.unlinkSync(oldPdfPath);
+        } catch (err) {
+          console.error('Error deleting old PDF:', err);
+        }
+      }
+    }
+
+    // Update Prediction Record
+    await Predictions.findByIdAndUpdate(id, {
+      name,
+      email,
+      mobileNumber: mobileNumber || predictionRecord.mobileNumber,
+      uniqueCode: uniqueCode || '',
+      crlRank: studentCrl,
+      category: category,
+      quota,
+      gender,
+      academicProgram,
+      examAppeared: examAppeared || 'JEE Main Only',
+      inputRank: studentCrl,
+      dreamCount: dreamColleges.length,
+      realisticCount: realisticColleges.length,
+      safeCount: safeColleges.length,
+      dreamColleges,
+      realisticColleges,
+      safeColleges,
+      pdfFilename: filename
+    });
+
+    const updatedPrediction = await Predictions.findOne({ _id: id });
+
+    return res.json({
+      message: 'Student prediction report updated successfully',
+      prediction: updatedPrediction
+    });
+
+  } catch (error) {
+    console.error('Error updating prediction:', error);
+    return res.status(500).json({ message: 'Error updating prediction report' });
+  }
+}
+
+/**
  * Delete Prediction Report
  */
 async function handleDeletePrediction(req, res) {
@@ -822,6 +973,198 @@ async function handleDeletePrediction(req, res) {
   }
 }
 
+/**
+ * Delete Student Record (Cascade deletes predictions and PDFs)
+ */
+async function handleDeleteStudent(req, res) {
+  const { email } = req.params;
+  try {
+    const deleted = await Leads.findOneAndDelete({ email });
+    if (!deleted) return res.status(404).json({ message: 'Student not found' });
+    
+    const predictions = await Predictions.find({ email });
+    for (const p of predictions) {
+      if (p.pdfFilename) {
+        const pdfPath = path.join(__dirname, '..', 'uploads', 'pdfs', p.pdfFilename);
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+      }
+      await Predictions.findByIdAndDelete(p._id);
+    }
+    
+    return res.json({ message: 'Student and related data deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting student:', error);
+    return res.status(500).json({ message: 'Error deleting student' });
+  }
+}
+
+/**
+ * Bulk Delete Students
+ */
+async function handleBulkDeleteStudents(req, res) {
+  const { emails } = req.body;
+  if (!Array.isArray(emails) || emails.length === 0) return res.status(400).json({ message: 'No emails provided' });
+  
+  try {
+    for (const email of emails) {
+      await Leads.findOneAndDelete({ email });
+      const predictions = await Predictions.find({ email });
+      for (const p of predictions) {
+        if (p.pdfFilename) {
+          const pdfPath = path.join(__dirname, '..', 'uploads', 'pdfs', p.pdfFilename);
+          if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+        }
+        await Predictions.findByIdAndDelete(p._id);
+      }
+    }
+    return res.json({ message: 'Selected students deleted successfully' });
+  } catch (error) {
+    console.error('Error bulk deleting students:', error);
+    return res.status(500).json({ message: 'Error bulk deleting students' });
+  }
+}
+
+/**
+ * Delete Entire Student Database
+ */
+async function handleDeleteAllStudents(req, res) {
+  try {
+    await Leads.deleteMany({});
+    const predictions = await Predictions.find({});
+    for (const p of predictions) {
+      if (p.pdfFilename) {
+        const pdfPath = path.join(__dirname, '..', 'uploads', 'pdfs', p.pdfFilename);
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+      }
+    }
+    await Predictions.deleteMany({});
+    return res.json({ message: 'Entire student database wiped successfully' });
+  } catch (error) {
+    console.error('Error wiping student DB:', error);
+    return res.status(500).json({ message: 'Error wiping student database' });
+  }
+}
+
+/**
+ * Bulk Delete Predictions
+ */
+async function handleBulkDeletePredictions(req, res) {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'No IDs provided' });
+  
+  try {
+    for (const id of ids) {
+      const p = await Predictions.findById(id);
+      if (p) {
+        if (p.pdfFilename) {
+          const pdfPath = path.join(__dirname, '..', 'uploads', 'pdfs', p.pdfFilename);
+          if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+        }
+        await Predictions.findByIdAndDelete(id);
+      }
+    }
+    return res.json({ message: 'Selected predictions deleted successfully' });
+  } catch (error) {
+    console.error('Error bulk deleting predictions:', error);
+    return res.status(500).json({ message: 'Error bulk deleting predictions' });
+  }
+}
+
+/**
+ * Delete Entire Prediction History
+ */
+async function handleDeleteAllPredictions(req, res) {
+  try {
+    const predictions = await Predictions.find({});
+    for (const p of predictions) {
+      if (p.pdfFilename) {
+        const pdfPath = path.join(__dirname, '..', 'uploads', 'pdfs', p.pdfFilename);
+        if (fs.existsSync(pdfPath)) fs.unlinkSync(pdfPath);
+      }
+    }
+    await Predictions.deleteMany({});
+    return res.json({ message: 'Entire prediction history wiped successfully' });
+  } catch (error) {
+    console.error('Error wiping predictions:', error);
+    return res.status(500).json({ message: 'Error wiping predictions' });
+  }
+}
+
+/**
+ * Bulk Delete Colleges
+ */
+async function handleBulkDeleteColleges(req, res) {
+  const { ids } = req.body;
+  if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ message: 'No IDs provided' });
+  
+  try {
+    await Cutoffs.deleteMany({ _id: { $in: ids } });
+    return res.json({ message: 'Selected colleges deleted successfully' });
+  } catch (error) {
+    console.error('Error bulk deleting colleges:', error);
+    return res.status(500).json({ message: 'Error bulk deleting colleges' });
+  }
+}
+
+/**
+ * Delete Entire College Database
+ */
+async function handleDeleteAllColleges(req, res) {
+  try {
+    await Cutoffs.deleteMany({});
+    return res.json({ message: 'Entire college database wiped successfully' });
+  } catch (error) {
+    console.error('Error wiping colleges:', error);
+    return res.status(500).json({ message: 'Error wiping colleges' });
+  }
+}
+
+/**
+ * Delete Uploaded Excel File
+ */
+async function handleDeleteUpload(req, res) {
+  const { filename } = req.params;
+  try {
+    const uploadPath = path.join(__dirname, '..', 'uploads', filename);
+    if (fs.existsSync(uploadPath)) {
+      fs.unlinkSync(uploadPath);
+      return res.json({ message: 'File deleted successfully' });
+    }
+    return res.status(404).json({ message: 'File not found' });
+  } catch (error) {
+    console.error('Error deleting file:', error);
+    return res.status(500).json({ message: 'Error deleting file' });
+  }
+}
+
+async function handleDeleteCutoffYear(req, res) {
+  try {
+    const { year } = req.params;
+    
+    // Validate year parameter
+    let yearQuery;
+    if (year === 'Unknown' || year === 'null' || year === 'undefined') {
+      yearQuery = { $in: [null, undefined, "", "Unknown"] };
+    } else {
+      yearQuery = Number(year);
+      if (isNaN(yearQuery)) {
+        return res.status(400).json({ success: false, message: "Invalid year format" });
+      }
+    }
+
+    const result = await Cutoffs.deleteMany({ year: yearQuery });
+    
+    res.json({
+      success: true,
+      message: `Successfully deleted ${result.deletedCount} records for year ${year}.`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error(`Error deleting cutoffs for year:`, error);
+    res.status(500).json({ success: false, message: "Error deleting records" });
+  }
+}
+
 module.exports = {
   handleLogin,
   verifyToken,
@@ -835,7 +1178,17 @@ module.exports = {
   handleGetCutoffYears,
   handleGetStats,
   handleGetPredictions,
+  handleUpdatePrediction,
   handleExportPredictions,
   handleResendPredictionEmail,
-  handleDeletePrediction
+  handleDeletePrediction,
+  handleDeleteStudent,
+  handleBulkDeleteStudents,
+  handleDeleteAllStudents,
+  handleBulkDeletePredictions,
+  handleDeleteAllPredictions,
+  handleBulkDeleteColleges,
+  handleDeleteAllColleges,
+  handleDeleteUpload,
+  handleDeleteCutoffYear
 };

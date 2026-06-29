@@ -92,15 +92,21 @@ const PredictionSchema = new mongoose.Schema({
   name: { type: String, required: true },
   email: { type: String, required: true },
   mobileNumber: { type: String },
+  uniqueCode: { type: String },
   crlRank: { type: Number, required: true },
   category: { type: String },
   quota: { type: String },
   gender: { type: String },
   examAppeared: { type: String },
+  instituteType: { type: String },
+  academicProgram: { type: String },
   inputRank: { type: Number },
   dreamCount: { type: Number, default: 0 },
   realisticCount: { type: Number, default: 0 },
   safeCount: { type: Number, default: 0 },
+  dreamColleges: { type: Array, default: [] },
+  realisticColleges: { type: Array, default: [] },
+  safeColleges: { type: Array, default: [] },
   pdfFilename: { type: String },
   emailStatus: { type: String, default: 'Pending' },
   createdAt: { type: Date, default: Date.now }
@@ -115,6 +121,21 @@ const AdminLoginLogSchema = new mongoose.Schema({
   username: { type: String }
 });
 const MongoAdminLoginLog = mongoose.models.AdminLoginLog || mongoose.model('AdminLoginLog', AdminLoginLogSchema);
+
+const BookSchema = new mongoose.Schema({
+  bookId: { type: String, required: true, unique: true },
+  status: { type: String, enum: ['Unused', 'Active', 'Expired', 'Deactivated'], default: 'Unused' },
+  studentName: { type: String },
+  studentEmail: { type: String },
+  studentMobile: { type: String },
+  predictionLimit: { type: Number, default: 20 },
+  predictionsUsed: { type: Number, default: 0 },
+  remainingPredictions: { type: Number, default: 20 },
+  activationDate: { type: Date },
+  lastUsed: { type: Date },
+  createdAt: { type: Date, default: Date.now }
+});
+const MongoBook = mongoose.models.Book || mongoose.model('Book', BookSchema);
 
 // ==========================================
 // LOCAL JSON DATABASE HELPER
@@ -231,6 +252,7 @@ const localCutoffs = new JSONDatabase('cutoffs');
 const localOtps = new JSONDatabase('otps');
 const localPredictions = new JSONDatabase('predictions');
 const localAdminLoginLogs = new JSONDatabase('admin_login_logs');
+const localBooks = new JSONDatabase('books');
 
 // ==========================================
 // UNIFIED API WRAPPER
@@ -341,12 +363,50 @@ const AdminLoginLogs = {
   }
 };
 
+const Books = {
+  find: async (query = {}) => {
+    if (useMongoDB && isConnected) return MongoBook.find(query).sort({ createdAt: -1 });
+    const list = await localBooks.find(query);
+    return list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  },
+  findOne: async (query = {}) => {
+    if (useMongoDB && isConnected) return MongoBook.findOne(query);
+    return localBooks.findOne(query);
+  },
+  create: async (doc) => {
+    if (useMongoDB && isConnected) return MongoBook.create(doc);
+    return localBooks.create(doc);
+  },
+  insertMany: async (docs) => {
+    if (useMongoDB && isConnected) return MongoBook.insertMany(docs);
+    return localBooks.insertMany(docs);
+  },
+  findByIdAndUpdate: async (id, doc) => {
+    if (useMongoDB && isConnected) return MongoBook.findByIdAndUpdate(id, doc, { new: true });
+    return localBooks.findByIdAndUpdate(id, doc);
+  },
+  findByIdAndDelete: async (id) => {
+    if (useMongoDB && isConnected) return MongoBook.findByIdAndDelete(id);
+    return localBooks.findByIdAndDelete(id);
+  },
+  deleteMany: async (query = {}) => {
+    if (useMongoDB && isConnected) return MongoBook.deleteMany(query);
+    return localBooks.deleteMany(query);
+  },
+  countDocuments: async (query = {}) => {
+    if (useMongoDB && isConnected) return MongoBook.countDocuments(query);
+    const list = await localBooks.find(query);
+    return list.length;
+  }
+};
+
 module.exports = {
   Leads,
   Cutoffs,
   Otps,
   Predictions,
   AdminLoginLogs,
+  Books,
   checkConnectionStatus: () => ({
     useMongoDB,
     isConnected: useMongoDB && isConnected,
@@ -375,6 +435,27 @@ module.exports = {
       }
     } catch (error) {
       console.error('Error initializing admin user:', error);
+    }
+    
+    // Seed Book IDs
+    try {
+      const bookCount = await Books.countDocuments({});
+      if (bookCount === 0) {
+        const seedBooks = [];
+        for (let i = 1; i <= 20; i++) {
+          seedBooks.push({
+            bookId: `BOOK${i.toString().padStart(3, '0')}`,
+            status: 'Unused',
+            predictionLimit: 20,
+            predictionsUsed: 0,
+            remainingPredictions: 20
+          });
+        }
+        await Books.insertMany(seedBooks);
+        console.log('Seeded 20 initial Book IDs.');
+      }
+    } catch (err) {
+      console.error('Error seeding book IDs:', err);
     }
   }
 };

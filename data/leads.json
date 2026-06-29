@@ -2,27 +2,27 @@
   {
     "_id": "1781766424284h65kt",
     "createdAt": "2026-06-18T07:07:04.284Z",
-    "name": "gopal",
+    "name": "Rishi",
     "email": "sharmarishianand@gmail.com",
-    "phone": "7868569787",
-    "rollNumber": "book-11",
+    "phone": "6543273456",
+    "rollNumber": "",
     "address": "alinagar",
-    "state": "Andhra Pradesh",
+    "state": "All States",
     "category": "OPEN",
-    "crlRank": 17656,
-    "categoryRank": 17656,
-    "preferredBranch": "Computer Science and Engineering",
+    "crlRank": 670,
+    "categoryRank": 670,
     "preferredColleges": "",
-    "mobileNumber": "7868569787",
-    "uniqueCode": "book-11",
+    "mobileNumber": "6543273456",
+    "uniqueCode": "",
     "quota": "AI",
     "instituteTypes": [
-      "ALL"
+      "all"
     ],
-    "academicProgram": "Computer Science and Engineering",
     "gender": "Gender-Neutral",
     "seatType": "OPEN",
-    "examAppeared": "JEE Main + JEE Advanced"
+    "examAppeared": "JEE Main Only",
+    "academicProgram": [],
+    "preferredBranch": []
   },
   {
     "_id": "1781769172964ldcno",
