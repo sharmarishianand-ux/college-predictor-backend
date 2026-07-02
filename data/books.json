@@ -164,12 +164,12 @@
     "bookId": "book1",
     "status": "Active",
     "predictionLimit": 50,
-    "predictionsUsed": 14,
-    "remainingPredictions": 36,
-    "studentName": "Rishi",
+    "predictionsUsed": 20,
+    "remainingPredictions": 30,
+    "studentName": "rishi",
     "studentEmail": "sharmarishianand@gmail.com",
-    "studentMobile": "6543273456",
+    "studentMobile": "4534679834",
     "activationDate": "2026-06-29T11:05:39.042Z",
-    "lastUsed": "2026-06-29T17:18:58.166Z"
+    "lastUsed": "2026-06-29T17:38:36.324Z"
   }
 ]

@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const multer = require('multer');
 const fs = require('fs');
 const path = require('path');
@@ -57,8 +59,39 @@ if (!fs.existsSync(UPLOADS_DIR)) {
 const app = express();
 const PORT = process.env.PORT || 5001;
 
-// Middleware
-app.use(cors());
+// Security Middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" } // allows serving static uploads safely
+}));
+
+// Restrict CORS to authorized domains only
+const allowedOrigins = [
+  'https://vijaypathtestseries.com',
+  'https://counsellingiseasy4u.com',
+  'http://localhost:3000'
+];
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  }
+}));
+
+// Rate Limiters
+const otpLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 10, // 10 requests per 15 minutes per IP
+  message: { message: 'Too many OTP requests from this IP, please try again later.' }
+});
+
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // 5 login attempts per 15 minutes per IP
+  message: { message: 'Too many login attempts from this IP, please try again later.' }
+});
 app.use(express.json());
 app.use('/uploads', express.static(UPLOADS_DIR));
 
@@ -99,7 +132,7 @@ app.get('/api/health', (req, res) => {
 // ==========================================
 // STUDENT PATHS
 // ==========================================
-app.post('/api/otp/send', handleSendOTP);
+app.post('/api/otp/send', otpLimiter, handleSendOTP);
 app.post('/api/otp/verify', handleVerifyOTP);
 app.post('/api/predict', handlePredictColleges);
 app.post('/api/student/login', handleStudentLogin);
@@ -110,7 +143,7 @@ app.get('/api/branches', handleGetBranches);
 // ==========================================
 // ADMIN PATHS
 // ==========================================
-app.post('/api/admin/login', handleLogin);
+app.post('/api/admin/login', adminLoginLimiter, handleLogin);
 
 // Protected Admin Dashboard Endpoints (verifyToken required)
 app.get('/api/admin/stats', verifyToken, handleGetStats);

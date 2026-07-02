@@ -102,5 +102,13 @@
     "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15",
     "status": "Success",
     "username": "admin"
+  },
+  {
+    "_id": "1782756766981hw4kd",
+    "createdAt": "2026-06-29T18:12:46.981Z",
+    "ipAddress": "::1",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.4 Safari/605.1.15",
+    "status": "Success",
+    "username": "admin"
   }
 ]
